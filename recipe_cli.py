@@ -10,6 +10,7 @@ Usage:
 import os
 import sys
 import json
+import urllib.parse
 from typing import Optional
 
 # Add repo to path
@@ -111,13 +112,20 @@ Round to practical amounts. Use common package sizes."""
 
         scaled = call_claude(client, scale_prompt)
         
+        # Add Walmart search links to each shopping list item
+        shopping_list = scaled.get('shopping_list', [])
+        for item in shopping_list:
+            name = item.get('name', '')
+            query = urllib.parse.quote_plus(name)
+            item['walmart_url'] = f"https://www.walmart.com/search?q={query}"
+
         return {
             "success": True,
             "url": url,
             "recipe_name": scaled.get('recipe_name', parsed.get('recipe_name', 'Recipe')),
             "original_servings": parsed.get('original_servings', 4),
             "scaled_servings": servings,
-            "shopping_list": scaled.get('shopping_list', []),
+            "shopping_list": shopping_list,
             "estimated_cost": scaled.get('estimated_total_cost', 0),
             "storage_tips": scaled.get('storage_tips', {})
         }
@@ -147,9 +155,11 @@ def format_for_chat(result: dict) -> str:
         amount = item.get('amount', '')
         unit = item.get('unit', '')
         price = item.get('estimated_price', 0)
+        walmart_url = item.get('walmart_url', '')
         
         price_str = f" ~${price:.2f}" if price else ""
-        lines.append(f"• {name}: {amount} {unit}{price_str}")
+        link_str = f" → {walmart_url}" if walmart_url else ""
+        lines.append(f"• {name}: {amount} {unit}{price_str}{link_str}")
     
     lines.append("")
     lines.append(f"💰 **Estimated Total:** ${result.get('estimated_cost', 0):.2f}")
